@@ -1,0 +1,61 @@
+name: iOS 未签名 IPA 云构建
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖并构建前端
+        run: |
+          npm ci
+          npm run build
+
+      - name: 同步到 iOS 工程
+        run: npx cap sync ios
+
+      - name: Xcode 归档（不签名）
+        run: |
+          cd ios/App
+          xcodebuild archive \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: 打包未签名 IPA
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qry "提词器-unsigned-$VERSION.ipa" Payload
+          mv "提词器-unsigned-$VERSION.ipa" "$GITHUB_WORKSPACE/"
+          ls -lh "$GITHUB_WORKSPACE/提词器-unsigned-$VERSION.ipa"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: 提词器-unsigned-*.ipa
+          retention-days: 30

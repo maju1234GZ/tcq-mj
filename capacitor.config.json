@@ -1,0 +1,12 @@
+{
+  "appId": "com.solo.teleprompter",
+  "appName": "提词器",
+  "webDir": "dist",
+  "backgroundColor": "#000000",
+  "android": {
+    "allowMixedContent": true
+  },
+  "ios": {
+    "contentInset": "never"
+  }
+}
